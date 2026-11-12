@@ -6,5 +6,10 @@ services:
     container_name: ftth-photo-qc
     restart: unless-stopped
     ports:
-      - "3137:80"
-
+      - "3137:3137"
+    environment:
+      - PORT=3137
+      - NEXTCLOUD_URL=https://drive.gciconnect.my.id
+      - NEXTCLOUD_USER=gcibot
+      - NEXTCLOUD_PASSWORD=Gcidesign#1
+      - NEXTCLOUD_DIR=ftth-photo-qc

@@ -11,7 +11,17 @@ Aplikasi web progresif (**Offline-First PWA**) untuk memudahkan pengambilan foto
 
 ## Cara Menjalankan dengan Docker (Ubuntu 24.04 / Server)
 
-Aplikasi ini sudah dilengkapi dengan konfigurasi Docker multi-stage build dan Nginx yang siap digunakan di port **3137**.
+Aplikasi ini sudah dilengkapi dengan server Node.js dan integrasi penyimpanan otomatis ke **Nextcloud WebDAV** yang siap digunakan di port **3137**.
+
+### Konfigurasi Nextcloud
+Konfigurasi Nextcloud diatur melalui *environment variables* di `docker-compose.yml`:
+- `NEXTCLOUD_URL`: `https://drive.gciconnect.my.id`
+- `NEXTCLOUD_USER`: `gcibot`
+- `NEXTCLOUD_PASSWORD`: `Gcidesign#1`
+- `NEXTCLOUD_DIR`: `ftth-photo-qc`
+
+Seluruh foto yang diambil atau di-upload otomatis ditampung ke Nextcloud dengan struktur folder rapi:
+`ftth-photo-qc/<ClusterID - ClusterName>/<Nama Halaman - FAT>/<No>_<Deskripsi>.jpg`
 
 ### 1. Menggunakan Docker Compose (Direkomendasikan)
 Jalankan perintah berikut di direktori proyek:
@@ -41,7 +51,14 @@ docker compose down
 docker build -t ftth-photo-qc .
 
 # Jalankan container
-docker run -d --name ftth-photo-qc --restart unless-stopped -p 3137:80 ftth-photo-qc
+docker run -d --name ftth-photo-qc \
+  --restart unless-stopped \
+  -p 3137:3137 \
+  -e NEXTCLOUD_URL="https://drive.gciconnect.my.id" \
+  -e NEXTCLOUD_USER="gcibot" \
+  -e NEXTCLOUD_PASSWORD="Gcidesign#1" \
+  -e NEXTCLOUD_DIR="ftth-photo-qc" \
+  ftth-photo-qc
 ```
 
 ---

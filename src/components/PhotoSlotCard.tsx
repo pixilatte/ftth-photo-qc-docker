@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeftRight,
   Camera,
+  Cloud,
+  CloudOff,
   Loader2,
   MapPin,
   Maximize2,
@@ -120,6 +122,37 @@ export const PhotoSlotCard: React.FC<PhotoSlotCardProps> = ({
         <span className="absolute top-2 left-2 z-10 rounded-md bg-slate-900/75 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-xs">
           #{slot.slotIndex + 1}
         </span>
+
+        {/* Top-right Nextcloud Sync Status Badge */}
+        {record && (
+          <div className="absolute top-2 right-2 z-10">
+            {record.nextcloudStatus === 'synced' ? (
+              <span
+                title={`Tersimpan di Nextcloud:\n${record.nextcloudPath || ''}`}
+                className="flex items-center gap-1 rounded-md bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-xs backdrop-blur-xs"
+              >
+                <Cloud className="w-3 h-3 text-emerald-100" />
+                <span className="hidden sm:inline">Nextcloud</span>
+              </span>
+            ) : record.nextcloudStatus === 'uploading' ? (
+              <span
+                title="Mengunggah ke Nextcloud..."
+                className="flex items-center gap-1 rounded-md bg-blue-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-xs backdrop-blur-xs"
+              >
+                <Loader2 className="w-3 h-3 animate-spin text-white" />
+                <span className="hidden sm:inline">Upload...</span>
+              </span>
+            ) : (
+              <span
+                title={`Belum tersinkron ke Nextcloud${record.nextcloudError ? `: ${record.nextcloudError}` : ''}`}
+                className="flex items-center gap-1 rounded-md bg-amber-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-xs backdrop-blur-xs"
+              >
+                <CloudOff className="w-3 h-3 text-amber-100" />
+                <span className="hidden sm:inline">Pending</span>
+              </span>
+            )}
+          </div>
+        )}
 
         {busy ? (
           <div className="flex flex-col items-center gap-2 text-slate-600">

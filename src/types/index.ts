@@ -95,6 +95,11 @@ export interface PhotoRecord {
   height: number;
   createdAt: number;
   updatedAt: number;
+  /** Nextcloud storage status and path */
+  nextcloudPath?: string;
+  nextcloudStatus?: 'synced' | 'pending' | 'failed' | 'uploading';
+  nextcloudError?: string;
+  nextcloudUploadedAt?: number;
 }
 
 export interface GeoCacheEntry {

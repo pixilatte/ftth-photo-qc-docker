@@ -1,32 +1,34 @@
-# Stage 1: Build the Vite + React application
+# Stage 1: Build Vite frontend
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency manifests
 COPY package.json package-lock.json ./
-
-# Install dependencies cleanly
 RUN npm ci
 
-# Copy source code and build
 COPY . .
 RUN npm run build
 
-# Stage 2: Serve using Nginx Alpine
-FROM nginx:alpine
+# Stage 2: Production runtime with Node.js
+FROM node:22-alpine
 
-# Remove default static files
-RUN rm -rf /usr/share/nginx/html/*
+WORKDIR /app
 
-# Copy build artifacts from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy built frontend assets
+COPY --from=builder /app/dist ./dist
 
-# Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy server script and package definition
+COPY package.json ./
+COPY server.js ./
 
-# Expose port 80 inside container
-EXPOSE 80
+# Set default environment variables
+ENV NODE_ENV=production \
+    PORT=3137 \
+    NEXTCLOUD_URL=https://drive.gciconnect.my.id \
+    NEXTCLOUD_USER=gcibot \
+    NEXTCLOUD_PASSWORD=Gcidesign#1 \
+    NEXTCLOUD_DIR=ftth-photo-qc
 
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 3137
 
+CMD ["node", "server.js"]

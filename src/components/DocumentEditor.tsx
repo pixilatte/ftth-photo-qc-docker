@@ -10,6 +10,8 @@ import {
   Camera,
   ChevronDown,
   ChevronUp,
+  Cloud,
+  CloudOff,
   Copy,
   Database,
   Edit3,
@@ -17,6 +19,7 @@ import {
   FolderUp,
   HelpCircle,
   ListFilter,
+  Loader2,
   Plus,
   Trash2,
   Upload,
@@ -45,6 +48,12 @@ import {
   rotatePhotoRecord,
   updatePhotoWatermark,
 } from '../services/photoManager';
+import {
+  deletePhotoFromNextcloud,
+  getPhotoPathInfo,
+  syncAllDocumentPhotosToNextcloud,
+  uploadPhotoRecordToNextcloud,
+} from '../services/nextcloud';
 import {
   DocumentHeader,
   DocumentPage,
@@ -104,6 +113,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [previewSlotIdx, setPreviewSlotIdx] = useState<number | null>(null);
   const [watermarkSlotIdx, setWatermarkSlotIdx] = useState<number | null>(null);
   const [zipExporting, setZipExporting] = useState<boolean>(false);
+  const [nextcloudSyncing, setNextcloudSyncing] = useState<boolean>(false);
+  const [nextcloudSyncProgress, setNextcloudSyncProgress] = useState<string>('');
 
   const pageMultiUploadRef = useRef<HTMLInputElement | null>(null);
 
@@ -286,6 +297,15 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       if (oldPhotoId) {
         await deletePhotoIfUnreferenced(doc.id, oldPhotoId);
       }
+
+      // Auto upload ke Nextcloud di background
+      const targetSlot = activePage.slots[slotIndex];
+      if (targetSlot) {
+        const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, targetSlot);
+        uploadPhotoRecordToNextcloud(record, folderPath, fileName).catch((err) =>
+          console.warn('Nextcloud background upload:', err)
+        );
+      }
     } finally {
       markSlotBusy(pageId, slotIndex, false);
     }
@@ -359,6 +379,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         if (oldPhotoId) {
           await deletePhotoIfUnreferenced(doc.id, oldPhotoId);
         }
+
+        // Auto upload ke Nextcloud di background
+        const targetSlot = activePage.slots[slotIdx];
+        if (targetSlot) {
+          const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, targetSlot);
+          uploadPhotoRecordToNextcloud(record, folderPath, fileName).catch((err) =>
+            console.warn('Nextcloud background upload:', err)
+          );
+        }
+
         markSlotBusy(pageId, slotIdx, false);
       }
     } finally {
@@ -401,7 +431,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     if (!pid) return;
     markSlotBusy(activePage.id, slotIdx, true);
     try {
-      await rotatePhotoRecord(pid);
+      const updated = await rotatePhotoRecord(pid);
+      if (updated) {
+        const slot = activePage.slots[slotIdx];
+        if (slot) {
+          const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, slot);
+          uploadPhotoRecordToNextcloud(updated, folderPath, fileName).catch(() => {});
+        }
+      }
     } finally {
       markSlotBusy(activePage.id, slotIdx, false);
     }
@@ -412,6 +449,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     const pageId = activePage.id;
     const oldPhotoId = activePage.slots[slotIdx]?.photoId;
     if (!oldPhotoId) return;
+
+    // Hapus file di Nextcloud jika ada path tersimpan
+    const oldPhoto = photoMap.get(oldPhotoId);
+    if (oldPhoto?.nextcloudPath) {
+      deletePhotoFromNextcloud(oldPhoto.nextcloudPath).catch(() => {});
+    }
 
     await updateDocument(doc.id, (curr) => ({
       ...curr,
@@ -446,6 +489,25 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   };
 
+  const handleSyncNextcloud = async () => {
+    if (!doc || nextcloudSyncing) return;
+    setNextcloudSyncing(true);
+    setNextcloudSyncProgress('0%');
+    try {
+      const res = await syncAllDocumentPhotosToNextcloud(doc, (done, total) => {
+        setNextcloudSyncProgress(`${done}/${total}`);
+      });
+      if (res.failCount > 0) {
+        alert(`Sinkronisasi selesai: ${res.successCount} berhasil diupload, ${res.failCount} gagal.`);
+      }
+    } catch (err: any) {
+      alert(`Gagal sinkronisasi ke Nextcloud: ${err.message}`);
+    } finally {
+      setNextcloudSyncing(false);
+      setNextcloudSyncProgress('');
+    }
+  };
+
   const openGuidedCameraForPage = () => {
     if (!activePage) return;
     const firstEmpty = activePage.slots.find((s) => !s.photoId);
@@ -469,6 +531,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     (s, p) => s + p.slots.filter((sl) => Boolean(sl.photoId)).length,
     0
   );
+  const syncedPhotosCount = photos.filter((p) => p.nextcloudStatus === 'synced').length;
+  const pendingNextcloudCount = Math.max(0, totalFilledCount - syncedPhotosCount);
+  const allNextcloudSynced = totalFilledCount > 0 && pendingNextcloudCount === 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100">
@@ -538,6 +603,33 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               <Archive className="w-4 h-4 text-slate-600" />
               <span className="hidden sm:inline">
                 {zipExporting ? 'Membuat ZIP...' : 'Backup .ZIP'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              disabled={nextcloudSyncing || totalFilledCount === 0}
+              onClick={handleSyncNextcloud}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-semibold shadow-xs transition active:scale-95 disabled:opacity-50 ${
+                allNextcloudSynced
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+              }`}
+              title="Upload & sinkronisasi seluruh foto dokumen ke folder Nextcloud"
+            >
+              {nextcloudSyncing ? (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              ) : allNextcloudSynced ? (
+                <Cloud className="w-4 h-4 text-emerald-600" />
+              ) : (
+                <CloudOff className="w-4 h-4 text-blue-600" />
+              )}
+              <span className="hidden sm:inline">
+                {nextcloudSyncing
+                  ? `Sync (${nextcloudSyncProgress})...`
+                  : allNextcloudSynced
+                    ? `Nextcloud (${totalFilledCount})`
+                    : `Sync Nextcloud (${pendingNextcloudCount})`}
               </span>
             </button>
 
@@ -1083,11 +1175,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           activePageIndex={safePageIdx}
           defaultWatermarkEnabled={doc.defaultWatermarkOnUpload}
           onComplete={async (updatedPages, lastIdx) => {
-            await updateDocument(doc.id, (curr) => ({
+            const updated = await updateDocument(doc.id, (curr) => ({
               ...curr,
               pages: updatedPages,
             }));
             setActivePageIdx(lastIdx);
+            if (updated) {
+              syncAllDocumentPhotosToNextcloud(updated).catch(() => {});
+            }
           }}
           onClose={() => setShowBulkUpload(false)}
         />
@@ -1161,7 +1256,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             activePage.slots.filter((s) => s.photoId && photoMap.has(s.photoId)).length
           }
           onSaveSingle={async (wmEnabled, wmData) => {
-            await updatePhotoWatermark(watermarkRecord.id, wmEnabled, wmData);
+            const updated = await updatePhotoWatermark(watermarkRecord.id, wmEnabled, wmData);
+            if (updated) {
+              const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, watermarkSlot);
+              uploadPhotoRecordToNextcloud(updated, folderPath, fileName).catch(() => {});
+            }
           }}
           onSaveAllInPage={async (wmEnabled, wmData, syncTimestamp) => {
             for (const s of activePage.slots) {
@@ -1177,7 +1276,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   ? wmData.isoTimestamp
                   : existing.watermark.isoTimestamp || wmData.isoTimestamp,
               };
-              await updatePhotoWatermark(existing.id, wmEnabled, mergedWm);
+              const updated = await updatePhotoWatermark(existing.id, wmEnabled, mergedWm);
+              if (updated) {
+                const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, s);
+                uploadPhotoRecordToNextcloud(updated, folderPath, fileName).catch(() => {});
+              }
             }
           }}
           onClose={() => setWatermarkSlotIdx(null)}
