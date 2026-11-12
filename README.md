@@ -11,10 +11,15 @@ Aplikasi web progresif (**Offline-First PWA**) untuk memudahkan pengambilan foto
 
 ## Cara Menjalankan dengan Docker (Ubuntu 24.04 / Server)
 
-Aplikasi ini sudah dilengkapi dengan server Node.js dan integrasi penyimpanan otomatis ke **Nextcloud WebDAV** yang siap digunakan di port **3137**.
+Aplikasi ini sudah dilengkapi dengan server Node.js, database SQLite terpusat untuk **kolaborasi multi-device antar laptop/HP**, dan backup penyimpanan otomatis ke **Nextcloud WebDAV** di port **3137**.
 
-### Konfigurasi Nextcloud
-Konfigurasi Nextcloud diatur melalui *environment variables* di `docker-compose.yml`:
+### Fitur Kolaborasi Multi-Device (Real-time Sync)
+- **Database Terpusat**: Dokumen dan foto tersimpan di server (`/app/data`), sehingga siapapun yang membuka website (misal via domain `https://fotoqc.gciconnect.my.id/`) dapat melihat, mengedit, dan melanjutkan pekerjaan teknisi lainnya secara bersamaan.
+- **Dukungan Offline Tetap Aktif**: Jika teknisi di lapangan kehilangan sinyal, aplikasi tetap dapat mengambil foto dan menyimpan ke memori lokal HP (IndexedDB). Begitu tersambung kembali, data otomatis tersinkronisasi ke server dan Nextcloud.
+
+### Konfigurasi Nextcloud & Volume
+Data dokumen dan foto disimpan di volume Docker `qc_data` agar data tidak hilang saat container di-restart/rebuild. Konfigurasi diatur di `docker-compose.yml`:
+- `DATA_DIR`: `/app/data` (disimpan permanen di volume `qc_data`)
 - `NEXTCLOUD_URL`: `https://drive.gciconnect.my.id`
 - `NEXTCLOUD_USER`: `gcibot`
 - `NEXTCLOUD_PASSWORD`: `Gcidesign#1`

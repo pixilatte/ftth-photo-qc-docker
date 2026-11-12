@@ -15,6 +15,10 @@ import {
   DEFAULT_SITE_REFERENCES,
   parseSiteListCsv,
 } from '../presets/siteReferences';
+import {
+  deleteDocumentFromServer,
+  pushDocumentToServer,
+} from '../services/cloudSync';
 
 class PhotoQcDatabase extends Dexie {
   documents!: EntityTable<QcDocument, 'id'>;
@@ -124,6 +128,11 @@ export async function saveGlobalSettings(patch: Partial<AppSettings>): Promise<A
   const current = await getGlobalSettings();
   const updated: AppSettings = { ...current, ...patch, id: 'global' };
   await db.settings.put(updated);
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updated),
+  }).catch(() => {});
   return updated;
 }
 
@@ -153,6 +162,7 @@ export async function createDocument(params: {
     updatedAt: now,
   };
   await db.documents.add(doc);
+  pushDocumentToServer(doc).catch(() => {});
   return doc;
 }
 
@@ -169,6 +179,9 @@ export async function updateDocument(
     await db.documents.put(next);
     result = next;
   });
+  if (result) {
+    pushDocumentToServer(result).catch(() => {});
+  }
   return result;
 }
 
@@ -177,6 +190,7 @@ export async function deleteDocumentCascade(docId: string): Promise<void> {
     await db.photos.where('documentId').equals(docId).delete();
     await db.documents.delete(docId);
   });
+  deleteDocumentFromServer(docId).catch(() => {});
 }
 
 export async function deletePhotoIfUnreferenced(docId: string, photoId: string): Promise<void> {

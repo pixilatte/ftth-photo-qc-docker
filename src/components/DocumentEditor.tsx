@@ -55,6 +55,11 @@ import {
   uploadPhotoRecordToNextcloud,
 } from '../services/nextcloud';
 import {
+  syncDocumentPhotosFromServer,
+  syncDocumentsWithServer,
+  uploadPhotoToServer,
+} from '../services/cloudSync';
+import {
   DocumentHeader,
   DocumentPage,
   PhotoRecord,
@@ -125,6 +130,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   useEffect(() => {
     setSwapSourceSlot(null);
   }, [activePageIdx]);
+
+  useEffect(() => {
+    if (!doc) return;
+    syncDocumentPhotosFromServer(doc);
+    const interval = setInterval(() => {
+      syncDocumentsWithServer();
+      syncDocumentPhotosFromServer(doc);
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [doc?.id]);
 
   if (!doc) {
     return (
@@ -298,9 +313,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         await deletePhotoIfUnreferenced(doc.id, oldPhotoId);
       }
 
-      // Auto upload ke Nextcloud di background
+      // Auto upload ke server kolaborasi & Nextcloud di background
       const targetSlot = activePage.slots[slotIndex];
       if (targetSlot) {
+        uploadPhotoToServer(record, doc, activePage, targetSlot).catch(() => {});
         const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, targetSlot);
         uploadPhotoRecordToNextcloud(record, folderPath, fileName).catch((err) =>
           console.warn('Nextcloud background upload:', err)
@@ -380,9 +396,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           await deletePhotoIfUnreferenced(doc.id, oldPhotoId);
         }
 
-        // Auto upload ke Nextcloud di background
+        // Auto upload ke server kolaborasi & Nextcloud di background
         const targetSlot = activePage.slots[slotIdx];
         if (targetSlot) {
+          uploadPhotoToServer(record, doc, activePage, targetSlot).catch(() => {});
           const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, targetSlot);
           uploadPhotoRecordToNextcloud(record, folderPath, fileName).catch((err) =>
             console.warn('Nextcloud background upload:', err)
@@ -435,6 +452,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       if (updated) {
         const slot = activePage.slots[slotIdx];
         if (slot) {
+          uploadPhotoToServer(updated, doc, activePage, slot).catch(() => {});
           const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, slot);
           uploadPhotoRecordToNextcloud(updated, folderPath, fileName).catch(() => {});
         }
@@ -1258,6 +1276,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           onSaveSingle={async (wmEnabled, wmData) => {
             const updated = await updatePhotoWatermark(watermarkRecord.id, wmEnabled, wmData);
             if (updated) {
+              uploadPhotoToServer(updated, doc, activePage, watermarkSlot).catch(() => {});
               const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, watermarkSlot);
               uploadPhotoRecordToNextcloud(updated, folderPath, fileName).catch(() => {});
             }
@@ -1278,6 +1297,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               };
               const updated = await updatePhotoWatermark(existing.id, wmEnabled, mergedWm);
               if (updated) {
+                uploadPhotoToServer(updated, doc, activePage, s).catch(() => {});
                 const { folderPath, fileName } = getPhotoPathInfo(doc, activePage, s);
                 uploadPhotoRecordToNextcloud(updated, folderPath, fileName).catch(() => {});
               }

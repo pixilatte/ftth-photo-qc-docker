@@ -12,12 +12,18 @@ import {
   FileText,
   FolderInput,
   HelpCircle,
+  RefreshCw,
   Search,
   Smartphone,
   Trash2,
   Wifi,
   WifiOff,
 } from 'lucide-react';
+import {
+  pushDocumentToServer,
+  syncDocumentsWithServer,
+  syncGlobalSettings,
+} from '../services/cloudSync';
 import { DEFAULT_MORA_LOGO, DEFAULT_ZTE_LOGO } from '../assets/defaultLogos';
 import {
   createDocument,
@@ -62,6 +68,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenDocument }) => {
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const triggerSync = async () => {
+    setIsSyncing(true);
+    try {
+      await syncDocumentsWithServer();
+      await syncGlobalSettings();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    triggerSync();
+    const interval = setInterval(triggerSync, 6000);
+    const onFocus = () => triggerSync();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   const zipInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -99,6 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenDocument }) => {
     setImportingZip(true);
     try {
       const imported = await importDocumentFromZip(file);
+      pushDocumentToServer(imported).catch(() => {});
       onOpenDocument(imported.id);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal mengimpor file proyek.');
@@ -221,6 +250,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenDocument }) => {
                       </>
                     )}
                   </span>
+
+                  <button
+                    type="button"
+                    onClick={triggerSync}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-blue-200 border border-blue-400/30 hover:bg-blue-500/30 transition"
+                    title="Sinkronisasi data dengan server kolaborasi"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-blue-300' : 'text-blue-300'}`} />
+                    <span className="hidden sm:inline">{isSyncing ? 'Sinkronisasi...' : 'Server Terhubung'}</span>
+                  </button>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
                   Dokumentasi Foto CW (termasuk Implementasi), CW SF, & EL (OPM) • Watermark opsional

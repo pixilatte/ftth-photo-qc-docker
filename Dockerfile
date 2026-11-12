@@ -24,10 +24,13 @@ COPY server.js ./
 # Set default environment variables
 ENV NODE_ENV=production \
     PORT=3137 \
+    DATA_DIR=/app/data \
     NEXTCLOUD_URL=https://drive.gciconnect.my.id \
     NEXTCLOUD_USER=gcibot \
     NEXTCLOUD_PASSWORD=Gcidesign#1 \
     NEXTCLOUD_DIR=ftth-photo-qc
+
+RUN mkdir -p /app/data
 
 EXPOSE 3137
 

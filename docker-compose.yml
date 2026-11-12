@@ -7,9 +7,15 @@ services:
     restart: unless-stopped
     ports:
       - "3137:3137"
+    volumes:
+      - qc_data:/app/data
     environment:
       - PORT=3137
+      - DATA_DIR=/app/data
       - NEXTCLOUD_URL=https://drive.gciconnect.my.id
       - NEXTCLOUD_USER=gcibot
       - NEXTCLOUD_PASSWORD=Gcidesign#1
       - NEXTCLOUD_DIR=ftth-photo-qc
+
+volumes:
+  qc_data:
