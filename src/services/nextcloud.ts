@@ -99,9 +99,20 @@ export async function uploadPhotoRecordToNextcloud(
       body: record.renderedBlob,
     });
 
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      const errMsg = `Respon server tidak valid (${res.status}): ${text.slice(0, 100)}`;
+      await db.photos.update(record.id, {
+        nextcloudStatus: 'failed',
+        nextcloudError: errMsg,
+      });
+      return { ok: false, error: errMsg };
+    }
+
     const data: NextcloudUploadResponse = await res.json().catch(() => ({
       ok: false,
-      error: `Server respon HTTP ${res.status}`,
+      error: `Server respon format salah (HTTP ${res.status})`,
     }));
 
     if (data.ok && data.path) {

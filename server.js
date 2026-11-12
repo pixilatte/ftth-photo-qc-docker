@@ -530,6 +530,94 @@ async function handleNextcloudStatus(req, res) {
   }
 }
 
+async function handleNextcloudUpload(req, res) {
+  const folderHeader = req.headers['x-folder-path'] || '';
+  const fileNameHeader = req.headers['x-file-name'] || '';
+  let decodedFolder = '';
+  let decodedFileName = '';
+  try {
+    decodedFolder = decodeURIComponent(folderHeader);
+  } catch {
+    decodedFolder = folderHeader;
+  }
+  try {
+    decodedFileName = decodeURIComponent(fileNameHeader);
+  } catch {
+    decodedFileName = fileNameHeader;
+  }
+
+  if (!decodedFileName) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Header x-file-name wajib diisi' }));
+  }
+
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
+  req.on('end', async () => {
+    try {
+      const buffer = Buffer.concat(chunks);
+      if (buffer.length === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: 'Data foto kosong' }));
+      }
+
+      const result = await uploadToNextcloud(decodedFolder, decodedFileName, buffer);
+      if (result.ok) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(
+          JSON.stringify({
+            ok: true,
+            path: result.path,
+          })
+        );
+      } else {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        return res.end(
+          JSON.stringify({
+            ok: false,
+            error: result.error || 'Gagal upload ke Nextcloud',
+          })
+        );
+      }
+    } catch (err) {
+      console.error('[handleNextcloudUpload error]', err);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: err.message }));
+    }
+  });
+}
+
+async function handleNextcloudDelete(req, res) {
+  let body = '';
+  req.on('data', (c) => (body += c));
+  req.on('end', async () => {
+    try {
+      const { path: filePath } = JSON.parse(body || '{}');
+      if (!filePath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: 'Path file tidak diberikan' }));
+      }
+
+      const segments = filePath.split('/').filter(Boolean);
+      const encodedPath = segments.map((s) => encodeURIComponent(s)).join('/');
+      const targetUrl = `${getWebDavBase()}/${encodedPath}`;
+
+      const delRes = await fetch(targetUrl, {
+        method: 'DELETE',
+        headers: {
+          Authorization: getAuthHeader(),
+        },
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, status: delRes.status }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: err.message }));
+    }
+  });
+}
+
 // MIME types map untuk file statis
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -673,6 +761,12 @@ const server = http.createServer((req, res) => {
   // Nextcloud Direct API
   if (pathname === '/api/nextcloud/status' && req.method === 'GET') {
     return handleNextcloudStatus(req, res);
+  }
+  if (pathname === '/api/nextcloud/upload' && req.method === 'POST') {
+    return handleNextcloudUpload(req, res);
+  }
+  if (pathname === '/api/nextcloud/delete' && req.method === 'POST') {
+    return handleNextcloudDelete(req, res);
   }
 
   // Frontend SPA Static Files

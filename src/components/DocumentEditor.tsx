@@ -516,7 +516,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         setNextcloudSyncProgress(`${done}/${total}`);
       });
       if (res.failCount > 0) {
-        alert(`Sinkronisasi selesai: ${res.successCount} berhasil diupload, ${res.failCount} gagal.`);
+        const detail = res.errors.length > 0 ? `\n\nDetail:\n${res.errors.slice(0, 5).join('\n')}` : '';
+        alert(`Sinkronisasi selesai: ${res.successCount} berhasil diupload, ${res.failCount} gagal.${detail}`);
+      } else {
+        alert(`Berhasil! Seluruh foto (${res.successCount}) telah terupload ke Nextcloud.`);
       }
     } catch (err: any) {
       alert(`Gagal sinkronisasi ke Nextcloud: ${err.message}`);
