@@ -1,0 +1,10 @@
+services:
+  ftth-photo-qc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ftth-photo-qc
+    restart: unless-stopped
+    ports:
+      - "3137:80"
+

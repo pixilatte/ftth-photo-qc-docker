@@ -9,7 +9,44 @@ Aplikasi web progresif (**Offline-First PWA**) untuk memudahkan pengambilan foto
 
 ---
 
-## Cara Menjalankan di Laptop / PC (Lokal)
+## Cara Menjalankan dengan Docker (Ubuntu 24.04 / Server)
+
+Aplikasi ini sudah dilengkapi dengan konfigurasi Docker multi-stage build dan Nginx yang siap digunakan di port **3137**.
+
+### 1. Menggunakan Docker Compose (Direkomendasikan)
+Jalankan perintah berikut di direktori proyek:
+```bash
+docker compose up -d --build
+```
+Aplikasi langsung dapat diakses di:
+```text
+http://<IP-SERVER>:3137
+# Contoh lokal: http://localhost:3137
+```
+
+Untuk melihat status atau log:
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+Untuk mematikan container:
+```bash
+docker compose down
+```
+
+### 2. Menggunakan Docker CLI Manual
+```bash
+# Build image
+docker build -t ftth-photo-qc .
+
+# Jalankan container
+docker run -d --name ftth-photo-qc --restart unless-stopped -p 3137:80 ftth-photo-qc
+```
+
+---
+
+## Cara Menjalankan di Laptop / PC (Lokal Dev)
 
 1. Buka terminal di folder proyek ini, lalu jalankan:
    ```bash
@@ -32,7 +69,7 @@ Browser HP mewajibkan koneksi **HTTPS** untuk mengizinkan akses **Kamera** dan *
 3. Buka **Cloudflare Pages** atau **app.netlify.com/drop**, lalu tarik (*drag & drop*) folder `dist/` ke halaman tersebut.
 4. Anda langsung mendapatkan link `https://...` yang bisa dibuka di HP, di-**Install ke Layar Utama HP (Add to Home Screen)**, dan tetap berjalan **Offline** meskipun sinyal hilang di lapangan!
 
-### Opsi 2: Vercel / GitHub Pages (Oomatis dari Git)
+### Opsi 2: Vercel / GitHub Pages (Otomatis dari Git)
 - Push proyek ini ke repository GitHub Anda:
   - Hubungkan ke **Vercel** (`vercel.json` sudah tersedia), **atau**
   - Aktifkan menu **Settings -> Pages -> Source: GitHub Actions** (`.github/workflows/deploy-pages.yml` sudah tersedia).
